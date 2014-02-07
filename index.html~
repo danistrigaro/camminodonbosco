@@ -62,7 +62,7 @@ img {
 }
 </style>
 </head>
-<body onload="init();" >
+<body>
 <h2>Image Download Demo</h2>
 
 <div id="status"></div>
