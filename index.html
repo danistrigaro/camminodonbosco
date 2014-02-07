@@ -1,76 +1,98 @@
-<!DOCTYPE html>
-<!--
-    Licensed to the Apache Software Foundation (ASF) under one
-    or more contributor license agreements.  See the NOTICE file
-    distributed with this work for additional information
-    regarding copyright ownership.  The ASF licenses this file
-    to you under the Apache License, Version 2.0 (the
-    "License"); you may not use this file except in compliance
-    with the License.  You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-    Unless required by applicable law or agreed to in writing,
-    software distributed under the License is distributed on an
-    "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-     KIND, either express or implied.  See the License for the
-    specific language governing permissions and limitations
-    under the License.
--->
+<!DOCTYPE HTML>
 <html>
-    <head>
-        <meta charset="utf-8" />
-        <meta name="format-detection" content="telephone=no" />
-        <meta name="viewport" content="user-scalable=no, initial-scale=1, maximum-scale=1, minimum-scale=1, width=device-width, height=device-height, target-densitydpi=device-dpi" />
-        <link rel="stylesheet" type="text/css" href="css/index.css" />
+<head>
+<meta name="viewport" content="width=320; user-scalable=no" />
+<meta http-equiv="Content-type" content="text/html; charset=utf-8">
+<title>Image Download Demo</title>
         <script type="text/javascript" src="phonegap.js"></script>  
-        <script type="text/javascript" charset="utf-8">
 
-        // Wait for PhoneGap to load
-        //
-        document.addEventListener("deviceready", onDeviceReady, false);
+<script type="text/javascript" charset="utf-8" src="js/jquery-1.10.2.min.js"></script>
+<script type="text/javascript" charset="utf-8">
+//Global instance of DirectoryEntry for our data
+var DATADIR;
+var knownfiles = [];    
 
-        // PhoneGap is ready
-        //
-        function onDeviceReady() {
+//Loaded my file system, now let's get a directory entry for where I'll store my crap    
+function onFSSuccess(fileSystem) {
+    fileSystem.root.getDirectory("Android/data/com.camden.imagedownloaddemo",{create:true},gotDir,onError);
+}
 
-            downloadFile()
+//The directory entry callback
+function gotDir(d){
+    console.log("got dir");
+    DATADIR = d;
+    var reader = DATADIR.createReader();
+    reader.readEntries(function(d){
+        gotFiles(d);
+        appReady();
+    },onError);
+}
 
-        }
+//Result of reading my directory
+function gotFiles(entries) {
+    console.log("The dir has "+entries.length+" entries.");
+for (var i=0; i<entries.length; i++) {
+console.log(entries[i].name+' dir? '+entries[i].isDirectory);
+        knownfiles.push(entries[i].name);
+        renderPicture(entries[i].fullPath);
+}
+}
 
-function downloadFile(){
+function renderPicture(path){
+    $("#photos").append("<img src='file://"+path+"'>");
+    console.log("<img src='file://"+path+"'>");
+}
 
-window.requestFileSystem(LocalFileSystem.PERSISTENT, 0, 
-    function onFileSystemSuccess(fileSystem) {
-        fileSystem.root.getFile(
-        "dummy.html", {create: true, exclusive: false}, 
-        function gotFileEntry(fileEntry) {
-            var sPath = fileEntry.fullPath.replace("dummy.html","");
-            var fileTransfer = new FileTransfer();
-            fileEntry.remove();
+function onError(e){
+    console.log("ERROR");
+    console.log(JSON.stringify(e));
+}
 
-            fileTransfer.download(
-                "http://www.w3.org/2011/web-apps-ws/papers/Nitobi.pdf",
-                sPath + "theFile.pdf",
-                function(theFile) {
-                    console.log("download complete: " + theFile.toURI());
-                    showLink(theFile.toURI());
-                },
-                function(error) {
-                    console.log("download error source " + error.source);
-                    console.log("download error target " + error.target);
-                    console.log("upload error code: " + error.code);
+function onDeviceReady() {
+    //what do we have in cache already?
+    $("#status").html("Checking your local cache....");    
+    window.requestFileSystem(LocalFileSystem.PERSISTENT, 0, onFSSuccess, null);    
+}
+
+function appReady(){
+    $("#status").html("Ready to check remote files...");
+    $.get("http://www.raymondcamden.com/demos/2012/jan/17/imagelister.cfc?method=listimages", {}, function(res) {
+        if (res.length > 0) {
+            $("#status").html("Going to sync some images...");
+            for (var i = 0; i < res.length; i++) {
+                if (knownfiles.indexOf(res[i]) == -1) {
+                    console.log("need to download " + res[i]);
+                    var ft = new FileTransfer();
+                    var dlPath = DATADIR.fullPath + "/" + res[i];
+                    console.log("downloading crap to " + dlPath);
+                    ft.download("http://www.raymondcamden.com/demos/2012/jan/17/" + escape(res[i]), dlPath, function(){
+                        renderPicture(dlPath);
+                        console.log("Successful download");
+                    }, onError);
                 }
-            );
-        }, fail);
-    }, fail);
-};
+            }
+        }
+        $("#status").html("");
+    }, "json");
 
-        </script>              
-        <title>Hello World</title>
-    </head>
-    <body>
-        <h1>Example</h1>
-        <p>Upload File</p>
-    </body>
+}
+
+function init() {
+document.addEventListener("deviceready", onDeviceReady, true);
+} 
+</script> 
+<style>
+img {
+    max-width: 200px;
+}
+</style>
+</head>
+<body onload="init();" >
+<h2>Image Download Demo</h2>
+
+<div id="status"></div>
+
+<div id="photos"></div>
+
+</body>
 </html>
